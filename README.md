@@ -13,7 +13,7 @@ Welcome to the URL Shortener Project. This project will guide you through buildi
 - Part 4: Building a URL Shortener CLI
 - Part 5: Performance Testing
 
-Double click on the html files for these instructions to open them up on your browser and follow along. 
+Double click on the html files for these instructions under ```docs/``` to open them up on your browser and follow along. 
 
 Organizing Your Coachable Repository
 ------------------------------------

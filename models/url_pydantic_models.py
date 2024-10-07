@@ -7,7 +7,7 @@ from typing import Optional
 class URLRequest(BaseModel):
     url: str
     custom_url: Optional[str] = None
-    length: Optional[int] = 6 #do i need to enforce a minimum? max?
+    length: int = 6 #do i need to enforce a minimum? max?
 
 
 class URLResponse(BaseModel):

@@ -27,6 +27,8 @@ async def create_short_url(request: URLRequest):
             return response
         else:
             raise HTTPException(status_code=404, detail="Short URL not found.")
+    except ValueError as ve:
+        raise HTTPException(status_code=409, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     

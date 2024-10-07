@@ -1,17 +1,19 @@
 from models.pynamodb_model import UrlEntry
 import uuid
 # This is where your URL shortening logic will go
-def generate_short_url(url: str, custom_url: str = None, short_id_length: int = 5) -> str:
+def generate_short_url(url: str, custom_url: str = None, short_id_length: int = 6) -> str:
     # Implement your URL shortening logic here
     try:
         if custom_url:
             #check if custom url already exists in db
-            if UrlEntry.get(custom_url):
+            try:
+                UrlEntry.get(custom_url)
                 raise ValueError("This custom URL is already in use.")
             #if custom_url not in database:
-            url_entry = UrlEntry(short_url=custom_url, original_url=url)            
-            url_entry.save()            
-            return custom_url
+            except UrlEntry.DoesNotExist:
+                url_entry = UrlEntry(short_url=custom_url, original_url=url)            
+                url_entry.save()            
+                return custom_url
         else:
             unique_id = str(uuid.uuid4())[:short_id_length]
             #check if the unique id already exists in db

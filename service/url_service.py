@@ -31,8 +31,6 @@ def generate_short_url(url: str, custom_url: str = None, short_id_length: int = 
     except Exception as e:
         raise ValueError(f"Error: {str(e)}")
         
-    
-    
 
 def get_original_url(short_url: str) -> str:
     try:
@@ -50,6 +48,7 @@ def get_url_list() -> dict[str, str]:
         return url_dict
     except Exception as e:
         raise ValueError(f"Error: {str(e)}")
+    
     
 def delete_url(short_url) -> str:
     try:

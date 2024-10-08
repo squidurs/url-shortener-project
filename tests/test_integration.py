@@ -13,7 +13,7 @@ class TestIntegration(unittest.TestCase):
     def test_integration(self):
         # Add integration tests here
         pass
-    #create short url no custom no collision
+    #test create short url (no custom. no collision)    
     @patch("models.pynamodb_model.UrlEntry.get")
     def test_create_short_url_no_collision(self, mock_get):
         mock_get.side_effect = UrlEntry.DoesNotExist()
@@ -25,7 +25,7 @@ class TestIntegration(unittest.TestCase):
         self.assertIn("original_url", data)
         self.assertEqual(data["original_url"], "https://example.com")
         
-    #create short url no custom WITH collision
+    #test create short url (no custom) WITH collision
     @patch("models.pynamodb_model.UrlEntry.get")
     def test_create_short_url_with_collision(self, mock_get):
         mock_get.side_effect = [UrlEntry.DoesNotExist(), None, UrlEntry.DoesNotExist()]
@@ -39,7 +39,7 @@ class TestIntegration(unittest.TestCase):
         #confirm unique short url on collison
         self.assertNotEqual(first_short_url, second_short_url)
      
-    #test create custom short url when custom url is available
+    #test create custom short url (no collision)
     @patch("models.pynamodb_model.UrlEntry.get")
     @patch("models.pynamodb_model.UrlEntry.save")
     def test_create_short_url_with_custom(self, mock_save, mock_get):
@@ -56,9 +56,9 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(data["short_url"], "omg123")
         self.assertEqual(data["original_url"], "https://example.com")
     
-    #test create custom when custom url is not available    
+    #test create custom with collision (custom url is taken)    
     @patch("models.pynamodb_model.UrlEntry.get")
-    def test_create_short_url_with_unavailable_custom(self, mock_get):
+    def test_create_custom_url_with_collision(self, mock_get):
         mock_get.return_value = UrlEntry(short_url="onetwo", original_url="https://example.com")
         
         response = client.post("/shorten", json={"url": "https://example.com", "custom_url": "onetwo"})
@@ -66,6 +66,13 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         data = response.json()
         self.assertIn("This custom URL is already in use.", data["detail"])
+    
+    # @patch("models.pynamodb_model.UrlEntry.get")
+    # def test_redirect(self, mock_get):
+    #     mock_get.return_value = UrlEntry(short_url="short", original_url="https://example.com")
+        
+    #     result = redirect_to_original_url("short")
+    #     self.assertEqual(result, "https://example.com")
         
     def test_list_urls(self):
         response = client.get("/list")

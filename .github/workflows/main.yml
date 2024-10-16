@@ -23,11 +23,11 @@ jobs:
       - name: Log in to Amazon ECR
         id: login-ecr
         run: |
-          aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 1560-4143-1924.dkr.ecr.us-east-2.amazonaws.com
+          aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 156041431924.dkr.ecr.us-east-2.amazonaws.com
 
       - name: Build, tag, and push Docker image
         env:
-          ECR_REGISTRY: 1560-4143-1924.dkr.ecr.us-east-2.amazonaws.com
+          ECR_REGISTRY: 156041431924.dkr.ecr.us-east-2.amazonaws.com
           ECR_REPOSITORY: url-shortener
           IMAGE_TAG: latest
         run: |
@@ -43,11 +43,11 @@ jobs:
       - name: Deploy on EC2
         run: |
           ssh -i ec2_key.pem -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_INSTANCE_IP }} << 'EOF'
-            aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 1560-4143-1924.dkr.ecr.us-east-2.amazonaws.com
-            docker pull 1560-4143-1924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
+            aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 156041431924.dkr.ecr.us-east-2.amazonaws.com
+            docker pull 156041431924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
             docker stop url_shortener_container || true
             docker rm url_shortener_container || true
-            docker run -d --name url_shortener_container -p 80:80 1560-4143-1924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
+            docker run -d --name url_shortener_container -p 80:8000 156041431924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
           EOF
 
       - name: Clean up SSH key

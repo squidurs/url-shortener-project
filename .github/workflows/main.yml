@@ -1,0 +1,54 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        run: |
+          aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 156041431924.dkr.ecr.us-east-2.amazonaws.com
+
+      - name: Build, tag, and push Docker image
+        env:
+          ECR_REGISTRY: 156041431924.dkr.ecr.us-east-2.amazonaws.com
+          ECR_REPOSITORY: url-shortener
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Set up SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY_PEM }}" > ec2_key.pem
+          chmod 600 ec2_key.pem
+
+      - name: Deploy on EC2
+        run: |
+          ssh -i ec2_key.pem -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_INSTANCE_IP }} << 'EOF'
+            aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 156041431924.dkr.ecr.us-east-2.amazonaws.com
+            docker pull 156041431924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
+            docker stop url_shortener_container || true
+            docker rm url_shortener_container || true
+            docker run -d --name url_shortener_container -p 80:8000 156041431924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
+          EOF
+
+      - name: Clean up SSH key
+        run: rm ec2_key.pem

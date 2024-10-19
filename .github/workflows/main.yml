@@ -47,7 +47,11 @@ jobs:
             docker pull 156041431924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
             docker stop url_shortener_container || true
             docker rm url_shortener_container || true
-            docker run -d --name url_shortener_container -p 80:8000 156041431924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
+            docker run -d --name url_shortener_container -p 443:8000 \
+            -v /etc/letsencrypt/live/smollink.com/fullchain.pem:/app/fullchain.pem \
+            -v /etc/letsencrypt/live/smollink.com/privkey.pem:/app/privkey.pem \
+            156041431924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest \
+            uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-keyfile /app/privkey.pem --ssl-certfile /app/fullchain.pem
           EOF
 
       - name: Clean up SSH key

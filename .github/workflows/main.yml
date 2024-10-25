@@ -35,23 +35,6 @@ jobs:
           docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Set up SSH key
+      - name: Update ECS service
         run: |
-          echo "${{ secrets.EC2_KEY_PEM }}" > ec2_key.pem
-          chmod 600 ec2_key.pem
-
-      - name: Deploy on EC2
-        run: |
-          ssh -i ec2_key.pem -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_INSTANCE_IP }} << 'EOF'
-            aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 156041431924.dkr.ecr.us-east-2.amazonaws.com
-            docker pull 156041431924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
-            docker stop url_shortener_container || true
-            docker rm url_shortener_container || true
-            docker run -d --name url_shortener_container -p 443:8000 \
-            -v /etc/letsencrypt/live/smollink.com/fullchain.pem:/app/fullchain.pem \
-            -v /etc/letsencrypt/live/smollink.com/privkey.pem:/app/privkey.pem \
-            156041431924.dkr.ecr.us-east-2.amazonaws.com/url-shortener:latest
-          EOF
-
-      - name: Clean up SSH key
-        run: rm ec2_key.pem
+          aws ecs update-service --cluster Cluster_one --service service_url_containers --force-new-deployment

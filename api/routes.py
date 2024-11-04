@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
-from models.url_pydantic_models import URLRequest, URLResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from models.url_pydantic_models import *
 from pydantic import ValidationError
 from service.url_service import *
-from datetime import datetime
+from service.utils import *
+from datetime import datetime, timedelta
 
 
 router = APIRouter()
@@ -15,7 +17,7 @@ async def read_root():
     return {"message": "Welcome to the URL Shortener API"}
 
 @router.post("/shorten")
-async def create_short_url(request: URLRequest):
+async def create_short_url(request: URLRequest, token: str=Depends(oauth_2_scheme)):
     """Creates a short URL for a given original URL.
 
     Args:
@@ -31,7 +33,8 @@ async def create_short_url(request: URLRequest):
         URLResponse: An object containing the generated short URL, the original URL, and a timestamp.
     """
     try:
-        short_url = generate_short_url(str(request.url), request.custom_url, request.length)
+        user = await get_current_user(token)
+        short_url = generate_short_url(str(request.url), user, request.custom_url, request.length)
         if request.url:
             response = URLResponse(
                 short_url=short_url,
@@ -74,8 +77,8 @@ async def redirect_to_original_url(short_url):
         #server error
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.get("/list_urls")
-async def list_url_pairs():
+@router.get("/list-urls")
+async def list_url_pairs(token: str = Depends(oauth_2_scheme)):
     """Retrieves all stored short-original URL pairs.
 
     Raises:
@@ -85,15 +88,34 @@ async def list_url_pairs():
     Returns:
         dict: A dictionary containing all short URLs as keys and their associated original URLs as values.
     """
+    username = await get_current_user(token)
+    user = get_user(username)
     try:
-        url_list = get_url_list()
+        #AUTHENTICATE ADMIN
+        if user.is_admin:
+            url_list = get_url_list()
+            if url_list:
+                return {"url_pairs": url_list}
+            else:
+                raise HTTPException(status_code=404, detail="No URLs found")
+        else:
+            raise HTTPException(status_code=403, detail="Admin privileges required.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.get("/list-my-urls")
+async def list_my_urls(token: str = Depends(oauth_2_scheme)):    
+    username = await get_current_user(token)
+    try:
+        url_list = get_user_url_list(username)
         if url_list:
             return {"url_pairs": url_list}
         else:
             raise HTTPException(status_code=404, detail="No URLs found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
     
 @router.delete("/delete-url/{short_url}")
 async def delete_url(short_url):
@@ -116,6 +138,64 @@ async def delete_url(short_url):
         raise HTTPException(status_code=404, detail="Short URL not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+       
+@router.post("/create-user", response_model=UserResponse)
+async def create_user(user_request: UserRequest):
+    #call create new user func from url service..
+    new_user = create_new_user(user_request.username, user_request.password)
+    return UserResponse(
+        username=new_user.user_id,
+        url_limit=new_user.url_limit,
+        is_admin=new_user.is_admin
+    )
+    
+
+@router.post("/login", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm=Depends()):
+    user = authenticate_user(form_data.username, form_data.password) 
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password", headers={"WWW-Authenticate": "Bearer"})
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub":user.user_id}, expires_delta=access_token_expires)
+    return {"access_token": access_token, "token_type": "bearer"}
+    
+
+
+@router.post("/change-password")
+async def change_password(user_request: UserRequest, token: str = Depends(oauth_2_scheme)):
+    
+    user = await get_current_user(token)
+    try:
+        update_password(user, user_request.password)
+        return {"message": "Password has been updated."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.post("/update-url-limit")
+async def update_url_limit(user_id: str, new_limit: int, token: str=Depends(oauth_2_scheme)):
+    username = await get_current_user(token)
+    user = get_user(username)
+    try:
+        #AUTHENTICATE ADMIN
+        if not user.is_admin:
+            raise HTTPException(status_code=403, detail="Admin privileges required.")
+        try:
+            user_to_update = UrlEntry.get(user_id)
+            user_to_update.update(actions=[
+            UserEntry.url_limit.set(new_limit)])
+            return {"message": f"User {user_id} limit updated to {new_limit}."}
+        except UserEntry.DoesNotExist:
+            raise HTTPException(status_code=404, detail="User not found.")          
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+            
+            
+            
+    
+
         
         
             

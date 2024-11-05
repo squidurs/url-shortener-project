@@ -3,7 +3,7 @@ from pynamodb.attributes import UnicodeAttribute, NumberAttribute, BooleanAttrib
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
 
 class UserIdIndex(GlobalSecondaryIndex):
-    """Index for querying URL entries by user_id."""
+    #Index for querying URL entries by user_id
     class Meta:
         index_name = "user_id-index"
         projection = AllProjection()
@@ -31,7 +31,7 @@ class UserEntry(Model):
     hashed_password = UnicodeAttribute()
     is_admin = BooleanAttribute(default=False)
     url_limit = NumberAttribute(default=20)
-    disabled = BooleanAttribute(default=False)
+    url_count = NumberAttribute(default=0)
     
         
         

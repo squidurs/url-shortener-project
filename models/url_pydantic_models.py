@@ -1,8 +1,6 @@
-from pydantic import BaseModel, HttpUrl, Field
+from pydantic import BaseModel, HttpUrl, Field, ValidationError, validator
 from datetime import datetime
 from typing import Optional
-# Define your models here
-
 
 class URLRequest(BaseModel):
     url: HttpUrl
@@ -23,20 +21,25 @@ class TokenData(BaseModel):
     username: str = None
     
 class UserRequest(BaseModel):
-    username: str = Field(default=None, min_length=8, max_length=15, description="Must be between 8 - 15 characters")
-    password: str = Field(default=None, min_length=8, max_length=15, description="Must be between 8 - 15 characters")
+    username: str = Field(default=None, min_length=8, max_length=15,
+        description="Username must be between 8 - 15 characters and contain only letters and numbers")
+    password: str = Field(default=None, min_length=8, max_length=15,
+        description="Password must be between 8 - 15 characters, include at least one uppercase letter, one lowercase letter, one number, and one special character")
     
-class UserResponse(BaseModel):
-    username: str
-    url_limit: int
-    is_admin: bool
-    
-class User(BaseModel):
-    user_id: str
-    hashed_password: str
-    url_limit: int = 20
-    is_admin: bool = False
-    disabled: bool = False
+    @validator('username')
+    def validate_username(cls, username):
+        if not username.isalnum() or not (8 <= len(username) <= 15):
+            raise ValueError("Username must be between 8 - 15 characters and contain only letters and numbers")
+        return username
+
+    @validator('password')
+    def validate_password(cls, password):
+        if (not any(c.isdigit() for c in password) or
+                not any(c.islower() for c in password) or
+                not any(c.isupper() for c in password) or
+                not any(c in '@$!%*?&' for c in password)):
+            raise ValueError("Password must be between 8 - 15 characters, include at least one uppercase letter, one lowercase letter, one number, and one special character")
+        return password
     
     
     

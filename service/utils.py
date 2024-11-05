@@ -1,19 +1,45 @@
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends, HTTPException, status
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from models.url_pydantic_models import TokenData
 from models.pynamodb_model import UserEntry
+import boto3
+import json
+from botocore.exceptions import ClientError
 
 
+def get_secret():
 
+    secret_name = "url-shortener/jwt_secret"
+    region_name = "us-east-2"
 
-# Add any utility functions you need here
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
 
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+    except ClientError as e:
+        # For a list of exceptions thrown, see
+        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+        print(f"Error retrieving secret: {e}") 
+        raise e
 
+    secret = get_secret_value_response['SecretString']
+    secret_dict = json.loads(secret)
+    
+    jwt_key =secret_dict['JWT_SECRET_KEY']
+    
+    return jwt_key
 
-SECRET_KEY = "010e8a5d8423450fc3f04320b4c605ab"
+SECRET_KEY = get_secret()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -90,11 +116,3 @@ async def get_current_user(token: str = Depends(oauth_2_scheme)):
     if not isinstance(user, UserEntry):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return username
-
-async def get_current_active_user(current_user: UserEntry = Depends(get_current_user)):
-    if not isinstance(current_user, UserEntry):
-        raise HTTPException(status_code=400, detail="Invalid user data")
-    if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    
-    return current_user.user_id

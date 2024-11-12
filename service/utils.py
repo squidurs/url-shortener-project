@@ -1,7 +1,7 @@
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends, HTTPException, status
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 from passlib.context import CryptContext
 from models.url_pydantic_models import TokenData
 from models.pynamodb_model import UserEntry
@@ -105,14 +105,15 @@ async def get_current_user(token: str = Depends(oauth_2_scheme)):
     credential_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        print(f"Decoded JWT payload: {payload}")
         username: str = payload.get("sub")
         if username is None:
             raise credential_exception
         token_data = TokenData(username=username)
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired", headers={"WWW-Authenticate": "Bearer"})
     except JWTError:
         raise credential_exception
     user = get_user(user_id=token_data.username)
     if not isinstance(user, UserEntry):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return username
+    return user

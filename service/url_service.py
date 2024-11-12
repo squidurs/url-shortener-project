@@ -1,6 +1,7 @@
 from models.pynamodb_model import UrlEntry, UserEntry
 from service.utils import *
 from pydantic import HttpUrl, ValidationError
+from service.exceptions import *
 import uuid
 
 
@@ -21,48 +22,43 @@ def generate_short_url(url: str, username: str, custom_url: str = None, short_id
     Returns:
         str: The generated or custom short URL that maps to the original URL.
     """
-    try:
-        valid_url = HttpUrl(url=url)
-        url = valid_url.__str__()
-        
-        user = get_user(username)
-        
-        if user.url_limit <= user.url_count:
-            raise ValueError("URL limit reached.")
-        
-        if custom_url:
-            #check if custom url already exists in db
-            try:
-                UrlEntry.get(custom_url)
-                raise ValueError("This custom URL is already in use.")
-            #if custom_url not in database:
+    valid_url = HttpUrl(url=url)
+    url = valid_url.__str__()
+    
+    user = get_user(username)
+    
+    if user.url_limit <= user.url_count:
+        raise UrlLimitReachedError("URL limit reached.")
+    
+    if custom_url:
+        #check if custom url already exists in db
+        try:
+            UrlEntry.get(custom_url)
+            raise CustomUrlExistsError("This custom URL is already in use.")
+        #if custom_url not in database:
+        except UrlEntry.DoesNotExist:
+            url_entry = UrlEntry(short_url=custom_url, original_url=url, user_id=user.user_id)            
+            url_entry.save()   
+            user.url_count += 1
+            user.save()         
+            return custom_url
+    else:
+        unique_id = str(uuid.uuid4())[:short_id_length]
+        #check if the unique id already exists in db
+        while True:
+            try: 
+                UrlEntry.get(unique_id)
+                #if the above line executes, the unique id was already in db and a new one needs to be generated
+                unique_id = str(uuid.uuid4())[:short_id_length]
+            #A unique id has been found
             except UrlEntry.DoesNotExist:
-                url_entry = UrlEntry(short_url=custom_url, original_url=url, user_id=user.user_id)            
-                url_entry.save()   
+                #save the unique id to the db
+                url_entry = UrlEntry(short_url=unique_id, original_url=url, user_id=user.user_id)                 
+                url_entry.save() 
                 user.url_count += 1
-                user.save()         
-                return custom_url
-        else:
-            unique_id = str(uuid.uuid4())[:short_id_length]
-            #check if the unique id already exists in db
-            while True:
-                try: 
-                    UrlEntry.get(unique_id)
-                    #if the above line executes, the unique id was already in db and a new one needs to be generated
-                    unique_id = str(uuid.uuid4())[:short_id_length]
-                #A unique id has been found
-                except UrlEntry.DoesNotExist:
-                    #save the unique id to the db
-                    url_entry = UrlEntry(short_url=unique_id, original_url=url, user_id=user)                    
-                    url_entry.save() 
-                    user.url_count += 1
-                    user.save()                   
-                    return unique_id
+                user.save()                   
+                return unique_id
         
-    except ValidationError:
-        raise ValueError("Invalid URL format")
-    except Exception as e:
-        raise ValueError(f"Error: {str(e)}")
         
 
 def get_original_url(short_url: str) -> str:
@@ -218,4 +214,9 @@ def update_password(username: str, new_password: str) -> dict:
             raise HTTPException(status_code=404, detail="User not found.")
     except Exception as e:
         raise ValueError(f"Error: {str(e)}")
+    
+def validate_admin_user(user: UserEntry) -> bool:
+    if not user.is_admin:
+        raise AdminPrivilegesRequiredError("Admin privileges required.")
+    return True
     

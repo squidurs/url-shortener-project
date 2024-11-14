@@ -245,8 +245,7 @@ async def update_url_limit(request: UpdateUrlLimitRequest, user: UserEntry = Dep
     try:
         validate_admin_user(user)
         user_to_update = UserEntry.get(user_to_update)
-        user_to_update.update(actions=[
-        UserEntry.url_limit.set(new_limit)])
+        user_to_update.update(actions=[UserEntry.url_limit.set(new_limit)])
         return {"message": f"User {user_to_update.user_id} limit updated to {new_limit}."}
     except UserEntry.DoesNotExist:
         raise HTTPException(status_code=404, detail="User not found.")          

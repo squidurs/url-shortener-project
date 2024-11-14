@@ -41,5 +41,8 @@ class UserRequest(BaseModel):
             raise ValueError("Password must be between 8 - 15 characters, include at least one uppercase letter, one lowercase letter, one number, and one special character")
         return password
     
+class UpdateUrlLimitRequest(BaseModel):
+    user_to_update: str
+    new_limit: int
     
     

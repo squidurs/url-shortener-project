@@ -26,6 +26,7 @@ jobs:
           aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 156041431924.dkr.ecr.us-east-2.amazonaws.com
 
       - name: Build, tag, and push Docker image
+        id: build-image
         env:
           ECR_REGISTRY: 156041431924.dkr.ecr.us-east-2.amazonaws.com
           ECR_REPOSITORY: url-shortener
@@ -34,7 +35,26 @@ jobs:
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"  
 
-      - name: Update ECS service
+      - name: Download task definition
         run: |
-          aws ecs update-service --cluster Cluster_one --service service_url_containers --force-new-deployment
+          aws ecs describe-task-definition --task-definition taskDefinition_url_containers \
+          --query taskDefinition > task-definition.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: non-ssl-container
+          image: ${{ steps.build-image.outputs.image }}  
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}  
+          service: service_url_containers
+          cluster: Cluster_one
+          wait-for-service-stability: true
+      
